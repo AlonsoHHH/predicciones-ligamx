@@ -153,3 +153,24 @@ def test_jugadores_partido_reparte_los_goles():
     t = extras.jugadores_partido(pd.DataFrame(filas), "A", 1.5)
     assert list(t["jugador"]) == ["J0", "J1", "J2"]
     assert -np.log(1 - t["p_gol"]).sum() == pytest.approx(1.5)     # los goles esperados se reparten completos
+
+
+def test_generador_niveles_y_evaluacion():
+    from ligamx import generador
+    cand = pd.DataFrame({"partido": [f"P{i}" for i in range(5) for _ in range(3)],
+                         "seleccion": ["segura", "media", "dificil"] * 5,
+                         "prob": [0.80, 0.58, 0.30] * 5})
+    g = generador.generar(cand)
+    assert list(g["nivel"].unique()) == ["Bajo", "Medio", "Alto"]
+    parlay = g[g["tipo"].str.startswith("Parlay")].iloc[0]
+    assert parlay["prob"] == pytest.approx(0.8 * 0.8) and parlay["apuesta"].count("(P") == 2
+    assert np.allclose(g["cuota_minima"], generador.MARGEN / g["prob"])
+    # un parlay nunca repite partido
+    for a in g["apuesta"]:
+        partidos = [x.split(")")[0] for x in a.split("(")[1:]]
+        assert len(partidos) == len(set(partidos))
+
+    reg = pd.DataFrame({"nivel": ["Bajo", "Bajo", "Bajo"], "prob": [0.8] * 3, "unidades": [2.0] * 3,
+                        "cuota_minima": [1.3] * 3, "cuota_draftea": [1.5, 1.5, 1.2], "gano": [1, 0, 1]})
+    e = generador.evaluar(reg).loc["Bajo"]      # la de 1.2 no llega a la mínima y no cuenta
+    assert e["apuestas"] == 2 and e["ganancia"] == pytest.approx(2 * 0.5 - 2)
