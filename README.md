@@ -52,6 +52,10 @@ streamlit run app.py
 python generar_apuestas.py
 python generar_apuestas.py --evaluar
 
+# Publicarla en un VPS Ubuntu/Debian (queda en http://IP-del-servidor:8501, con contraseña).
+# Pide el token de Sportmonks y la contraseña, y la deja como servicio que arranca solo.
+sudo bash desplegar.sh
+
 # Predicción de un partido, con cuotas de Draftea opcionales
 python predecir.py Toluca America --cuota over2.5=1.85 --cuota local=1.70 --cuota hcp_local-1.5=3.10
 

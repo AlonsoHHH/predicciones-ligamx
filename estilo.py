@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import hmac
+import os
+
 import pandas as pd
 import streamlit as st
 
@@ -62,7 +65,17 @@ VERDE = "color: #34d399; font-weight: 600; background-color: rgba(16, 185, 129, 
 
 
 def aplicar() -> None:
+    """Pone el estilo y, si existe la variable CLAVE_APP (app publicada), pide esa contraseña."""
     st.markdown(CSS, unsafe_allow_html=True)
+    clave = os.environ.get("CLAVE_APP")
+    if clave and not st.session_state.get("clave_ok"):
+        escrita = st.text_input("Contraseña", type="password")
+        if not hmac.compare_digest(escrita.encode(), clave.encode()):
+            if escrita:
+                st.error("Contraseña incorrecta.")
+            st.stop()
+        st.session_state["clave_ok"] = True
+        st.rerun()   # para que desaparezca el campo de contraseña
 
 
 def isla(en, titulo: str, valor: str, nota: str = "", alta: bool = False) -> None:
