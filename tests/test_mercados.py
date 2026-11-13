@@ -81,3 +81,14 @@ def test_resolver_equipo():
     assert datos.resolver_equipo("toluca", eq) == "Toluca"
     with pytest.raises(ValueError):
         datos.resolver_equipo("Barcelona", eq)
+
+
+def test_unir_tolera_un_dia_de_diferencia():
+    from ligamx import sportmonks
+    partidos = pd.DataFrame({"fecha": pd.to_datetime(["2026-11-08", "2026-11-09"]),
+                             "local": ["Toluca", "Atlas"], "visita": ["Atlas", "Toluca"]})
+    stats = pd.DataFrame({"fecha": pd.to_datetime(["2026-11-09", "2026-11-20"]),
+                          "local": ["Toluca", "Atlas"], "visita": ["Atlas", "Toluca"], "tiros_gol_l": [5, 3]})
+    u = sportmonks.unir(partidos, stats)
+    assert u.loc[u.local == "Toluca", "tiros_gol_l"].item() == 5
+    assert u.loc[u.local == "Atlas", "tiros_gol_l"].isna().item()

@@ -36,6 +36,7 @@ class DixonColes:
     local: float = 0.3
     base: float = 0.1
     rho: float = -0.05
+    peso_xg: float = 0.0   # mezcla goles reales con xG aproximado (columnas xg_l, xg_v)
     fecha_corte: pd.Timestamp | None = None
     _x0: np.ndarray | None = None
 
@@ -57,8 +58,13 @@ class DixonColes:
         n = len(equipos)
         il = df["local"].map(idx).to_numpy()
         iv = df["visita"].map(idx).to_numpy()
-        x = df["gl"].to_numpy(float)
-        y = df["gv"].to_numpy(float)
+        gl = df["gl"].to_numpy(float)
+        gv = df["gv"].to_numpy(float)
+        x, y = gl, gv
+        if self.peso_xg and "xg_l" in df:
+            # Poisson acepta conteos no enteros; la corrección tau sigue usando el marcador real.
+            x = np.where(df["xg_l"].notna(), (1 - self.peso_xg) * gl + self.peso_xg * df["xg_l"], gl)
+            y = np.where(df["xg_v"].notna(), (1 - self.peso_xg) * gv + self.peso_xg * df["xg_v"], gv)
 
         x0 = np.zeros(2 * n + 3)
         x0[2 * n:] = [0.1, 0.3, -0.05]
@@ -78,10 +84,10 @@ class DixonColes:
             g_rho = np.zeros_like(x)
 
             tau = np.ones_like(x)
-            m00 = (x == 0) & (y == 0)
-            m01 = (x == 0) & (y == 1)
-            m10 = (x == 1) & (y == 0)
-            m11 = (x == 1) & (y == 1)
+            m00 = (gl == 0) & (gv == 0)
+            m01 = (gl == 0) & (gv == 1)
+            m10 = (gl == 1) & (gv == 0)
+            m11 = (gl == 1) & (gv == 1)
             tau[m00] = 1 - lam[m00] * mu[m00] * rho
             tau[m01] = 1 + lam[m01] * rho
             tau[m10] = 1 + mu[m10] * rho

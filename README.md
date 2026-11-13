@@ -19,7 +19,11 @@ pensado para comparar contra las cuotas de Draftea.
 4. **Mercados** (`ligamx/mercados.py`): de la matriz de marcadores salen 1X2,
    over/under, hándicap (con devolución en líneas enteras, como en Draftea),
    ambos anotan, cuota justa, valor esperado y Kelly fraccional.
-5. **Backtest** (`ligamx/backtest.py`): walk-forward semanal, sin ver el
+5. **Sportmonks** (`ligamx/sportmonks.py`): estadísticas por partido (tiros,
+   tiros a gol, ocasiones claras). Con `--peso-xg` el modelo mezcla los goles
+   con un xG aproximado a partir de los tiros. El token lo agrega el entorno
+   cloud; en otra máquina, define `SPORTMONKS_API_TOKEN`.
+6. **Backtest** (`ligamx/backtest.py`): walk-forward semanal, sin ver el
    futuro, contra el mercado de cierre.
 
 ## Uso
@@ -44,7 +48,8 @@ decimal.
 ## Resultados actuales
 
 Backtest con 1,061 partidos de fase regular (Apertura 2023 a Apertura 2026),
-entrenando sólo con las temporadas 2021-22 en adelante:
+con todo el historial desde 2012 (las cifras casi no cambian si sólo se usa
+2021 en adelante):
 
 | 1X2 | Log-loss | Brier |
 |---|---|---|
@@ -65,6 +70,11 @@ los extremos. Es una línea base: los siguientes pasos son entrenar con todo el
 historial desde 2012, agregar features propias de la Liga MX (altitud, viajes,
 descanso), xG y cuotas históricas de over/under para medir valor en ese
 mercado.
+
+Con las estadísticas de Sportmonks (sólo hay 3 temporadas en el plan Starter),
+el xG aproximado por tiros **no mejoró** el modelo en 449 partidos desde julio de
+2025: el log-loss 1X2 pasó de 1.030 a 1.031 con `--peso-xg 0.3`, y en over/under
+2.5 de 0.703 a 0.702, ambos aún peores que el mercado o la tasa base.
 
 **No uses estas probabilidades para apostar dinero real hasta que el backtest
 muestre ventaja sobre el mercado.**

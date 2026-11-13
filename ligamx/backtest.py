@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
-from . import elo, mercados
+from . import elo, mercados, sportmonks
 from .datos import probabilidades_mercado
 from .dixon_coles import DixonColes
 
@@ -16,11 +16,16 @@ CLASES = ["l", "e", "v"]
 
 
 def predecir_walk_forward(df: pd.DataFrame, desde: str, xi: float | None = None,
-                          l2: float | None = None) -> pd.DataFrame:
+                          l2: float | None = None, peso_xg: float = 0.0,
+                          stats: pd.DataFrame | None = None) -> pd.DataFrame:
     df = df.sort_values("fecha", kind="mergesort").reset_index(drop=True)
+    if peso_xg:
+        # Los coeficientes del xG se ajustan sólo con partidos anteriores a `desde`.
+        df = sportmonks.unir(df, stats).reset_index(drop=True)
+        df["xg_l"], df["xg_v"] = sportmonks.ajustar_xg(df[df["fecha"] < desde])(df)
     df, _ = elo.calcular(df)
     df["semana"] = df["fecha"].dt.to_period("W-MON").dt.start_time
-    modelo = DixonColes(**{k: v for k, v in {"xi": xi, "l2": l2}.items() if v is not None})
+    modelo = DixonColes(peso_xg=peso_xg, **{k: v for k, v in {"xi": xi, "l2": l2}.items() if v is not None})
     filas = []
     for semana, bloque in df[df["fecha"] >= pd.Timestamp(desde)].groupby("semana"):
         historia = df[df["fecha"] < semana]
