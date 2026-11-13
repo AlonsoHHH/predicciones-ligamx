@@ -4,3 +4,4 @@ scipy
 scikit-learn
 requests
 pytest
+streamlit

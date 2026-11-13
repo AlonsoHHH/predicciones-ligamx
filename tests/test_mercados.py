@@ -118,3 +118,38 @@ def test_regularidad_once():
     assert r["R3"] == pytest.approx(1.0)        # mismo once las 3 previas
     assert r["R4"] == pytest.approx(6 / 11)     # 5 cambios
     assert "R0" not in r.index                  # sin historia suficiente
+
+
+def test_mitades_y_primer_gol():
+    from ligamx import extras
+    x = extras.mitades_y_primer_gol(1.8, 1.2)
+    assert x["anota_primero_local"] + x["anota_primero_visita"] + x["sin_goles"] == pytest.approx(1.0)
+    assert x["anota_primero_local"] / x["anota_primero_visita"] == pytest.approx(1.5)
+    assert x["gol_2a_mitad"] > x["gol_1a_mitad"]
+
+
+def test_esperados_equipo_y_arbitro():
+    from ligamx import extras
+    f = pd.date_range("2026-08-01", periods=4, freq="7D")
+    stats = pd.DataFrame({"fecha": f, "local": ["A", "B", "A", "C"], "visita": ["B", "C", "C", "A"],
+                          "tiros_l": [20, 10, 20, 10], "tiros_v": [10, 10, 10, 20]})
+    e = extras.esperados_equipo(stats, "A", "B")
+    assert e.loc["tiros", "local"] > stats["tiros_l"].mean()      # A tira más que la liga
+    arb = pd.DataFrame({"arbitro": ["X"] * 5 + ["Y"] * 5, "amarillas_l": [4] * 5 + [1] * 5,
+                        "amarillas_v": [4] * 5 + [1] * 5})
+    suyo, n, liga = extras.tarjetas_arbitro(arb, "X")
+    assert (n, liga) == (5, 5.0) and suyo == pytest.approx(6.5)    # a medio camino entre 8 y 5
+    assert extras.tarjetas_arbitro(arb, "nuevo")[0] == pytest.approx(5.0)
+
+
+def test_jugadores_partido_reparte_los_goles():
+    from ligamx import extras
+    filas = []
+    for i, f in enumerate(pd.date_range("2026-08-01", periods=6, freq="7D")):
+        for pid, (goles, tg) in enumerate([(1, 3), (0, 1), (0, 0)]):
+            filas.append({"fecha": f, "local": "A", "visita": f"R{i}", "lado": "l", "player_id": pid,
+                          "jugador": f"J{pid}", "minutos": 90, "tiros": tg + 1, "tiros_gol": tg,
+                          "goles": goles, "asistencias": int(pid == 1), "pases_clave": pid})
+    t = extras.jugadores_partido(pd.DataFrame(filas), "A", 1.5)
+    assert list(t["jugador"]) == ["J0", "J1", "J2"]
+    assert -np.log(1 - t["p_gol"]).sum() == pytest.approx(1.5)     # los goles esperados se reparten completos
