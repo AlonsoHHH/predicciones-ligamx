@@ -38,6 +38,9 @@ pensado para comparar contra las cuotas de Draftea.
 ```bash
 pip install -r requirements.txt
 
+# Interfaz web: elige el partido, ve probabilidades y revisa si la cuota de Draftea tiene valor
+streamlit run app.py
+
 # Predicción de un partido, con cuotas de Draftea opcionales
 python predecir.py Toluca America --cuota over2.5=1.85 --cuota local=1.70 --cuota hcp_local-1.5=3.10
 
