@@ -151,3 +151,55 @@ def regularidad_once(alin: pd.DataFrame, ventana: int = 10) -> pd.DataFrame:
             previos.append(titulares)
     out = pd.DataFrame(filas)
     return out.groupby(["fecha", "local", "visita"], as_index=False).first()
+
+
+# type_id de las estadísticas por jugador (lineups.details)
+POR_JUGADOR = {119: "minutos", 42: "tiros", 86: "tiros_gol", 52: "goles", 79: "asistencias",
+               117: "pases_clave", 84: "amarillas"}
+GOL, PENAL, AUTOGOL = 14, 16, 15   # tipos de evento
+ARBITRO_CENTRAL = 6
+
+
+def detalle(forzar: bool = False) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Tres tablas por partido terminado:
+    - jugadores: una fila por jugador que jugó, con minutos, tiros, tiros a gol, goles,
+      asistencias, pases clave y amarillas.
+    - goles: una fila por gol, con minuto y lado.
+    - arbitros: árbitro central y amarillas de cada lado."""
+    rutas = [DIR_CACHE / f"sportmonks_{n}.csv" for n in ("jugadores", "goles", "arbitros")]
+    if all(r.exists() for r in rutas) and not forzar:
+        return tuple(pd.read_csv(r, parse_dates=["fecha"]) for r in rutas)
+    jugadores, goles, arbitros = [], [], []
+    for season_id in temporadas():
+        r = _get(f"seasons/{season_id}", include="fixtures.lineups.details;fixtures.events;"
+                                                 "fixtures.referees.referee;fixtures.participants")
+        for f in r["data"].get("fixtures") or []:
+            if f.get("state_id") != 5:
+                continue
+            equipos = {p["meta"]["location"]: p for p in f["participants"]}
+            lado = {equipos["home"]["id"]: "l", equipos["away"]["id"]: "v"}
+            base = {"fecha": pd.Timestamp(f["starting_at"]).normalize(),
+                    "local": NOMBRES.get(equipos["home"]["name"], equipos["home"]["name"]),
+                    "visita": NOMBRES.get(equipos["away"]["name"], equipos["away"]["name"])}
+            amarillas = {"l": 0, "v": 0}
+            for j in f.get("lineups") or []:
+                d = {POR_JUGADOR[s["type_id"]]: s["data"]["value"] for s in j.get("details") or []
+                     if s["type_id"] in POR_JUGADOR}
+                if j["team_id"] not in lado or not d.get("minutos"):
+                    continue
+                amarillas[lado[j["team_id"]]] += d.get("amarillas", 0)
+                jugadores.append({**base, "lado": lado[j["team_id"]], "player_id": j["player_id"],
+                                  "jugador": j["player_name"], "titular": j["type_id"] == 11, **d})
+            for e in f.get("events") or []:
+                if e["type_id"] in (GOL, PENAL, AUTOGOL) and e["participant_id"] in lado:
+                    goles.append({**base, "lado": lado[e["participant_id"]], "minuto": e["minute"]})
+            central = next((a["referee"]["common_name"] for a in f.get("referees") or []
+                            if a["type_id"] == ARBITRO_CENTRAL and a.get("referee")), None)
+            arbitros.append({**base, "arbitro": central, "amarillas_l": amarillas["l"],
+                             "amarillas_v": amarillas["v"]})
+    tablas = (pd.DataFrame(jugadores).fillna({c: 0 for c in POR_JUGADOR.values()}),
+              pd.DataFrame(goles), pd.DataFrame(arbitros))
+    for t, ruta in zip(tablas, rutas):
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        t.to_csv(ruta, index=False)
+    return tablas

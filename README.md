@@ -33,6 +33,11 @@ pensado para comparar contra las cuotas de Draftea.
 8. **Backtest** (`ligamx/backtest.py`): walk-forward semanal, sin ver el
    futuro, contra el mercado de cierre.
 
+9. **Extras** (`ligamx/extras.py`, con `sportmonks.detalle`): tiros, tiros a gol,
+   córners y amarillas esperados por equipo, ajuste de tarjetas por árbitro,
+   goles por mitad, quién anota primero, y por jugador: tiros esperados y
+   probabilidad de anotar y de asistir. Se ven en la interfaz.
+
 ## Uso
 
 ```bash
@@ -107,6 +112,18 @@ Lo que se probó y **no** ayudó (por eso no está en el código):
 - Lesionados y suspendidos de Sportmonks (`sidelined`), ponderados por qué tan
   titular era cada ausente: empeora a 1.034. Hay pocos registros (unos 1.5 por
   partido) y la alineación confirmada ya refleja las bajas.
+
+Validación de los extras (479 partidos desde julio de 2025, sólo con datos
+previos a cada partido):
+- Quién anota primero y gol en la primera mitad: bien calibrados (53% local
+  predicho contra 53% real; 72% contra 72%).
+- Gol y asistencia por jugador: calibrados entre 3% y 40% (por ejemplo, a los
+  que se les da 19% anotan 19%). Supone los minutos recientes del jugador.
+- Tiros y córners del partido: un poco mejores que usar el promedio de la liga
+  (error medio 4.9 contra 5.2 tiros; 2.69 contra 2.72 córners).
+- Tiros a gol y amarillas: **no** mejoran al promedio de la liga, ni con el
+  ajuste por árbitro. Tómalos como referencia descriptiva.
+- Ninguno se ha comparado contra cuotas reales de esos mercados.
 
 **No uses estas probabilidades para apostar dinero real hasta que el backtest
 muestre ventaja sobre el mercado.**
