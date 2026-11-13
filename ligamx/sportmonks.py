@@ -203,3 +203,19 @@ def detalle(forzar: bool = False) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFr
         ruta.parent.mkdir(parents=True, exist_ok=True)
         t.to_csv(ruta, index=False)
     return tablas
+
+
+def proximos(dias: int = 10) -> pd.DataFrame:
+    """Partidos de Liga MX por jugarse en los próximos `dias` (hora del centro de México)."""
+    hoy = pd.Timestamp.now(tz="UTC").normalize()
+    r = _get(f"fixtures/between/{hoy:%Y-%m-%d}/{hoy + pd.Timedelta(days=dias):%Y-%m-%d}",
+             filters=f"fixtureLeagues:{LIGA_MX}", include="participants", per_page=50)
+    filas = []
+    for f in r.get("data") or []:
+        equipos = {p["meta"]["location"]: p["name"] for p in f["participants"]}
+        if f.get("state_id") != 1 or "ranked" in f["name"]:   # 1 = por jugarse; "ranked" = liguilla sin definir
+            continue
+        filas.append({"inicio": pd.Timestamp(f["starting_at"], tz="UTC").tz_convert("America/Mexico_City"),
+                      "local": NOMBRES.get(equipos["home"], equipos["home"]),
+                      "visita": NOMBRES.get(equipos["away"], equipos["away"])})
+    return pd.DataFrame(filas, columns=["inicio", "local", "visita"]).sort_values("inicio").reset_index(drop=True)

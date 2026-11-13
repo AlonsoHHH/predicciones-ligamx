@@ -46,6 +46,12 @@ pip install -r requirements.txt
 # Interfaz web: elige el partido, ve probabilidades y revisa si la cuota de Draftea tiene valor
 streamlit run app.py
 
+# Apuestas sugeridas de los próximos partidos, en tres niveles de riesgo (también en la
+# página "Apuestas de la jornada" de la interfaz). Guarda un CSV en apuestas/ para capturar
+# la cuota de Draftea y el resultado; --evaluar resume cómo va cada nivel.
+python generar_apuestas.py
+python generar_apuestas.py --evaluar
+
 # Predicción de un partido, con cuotas de Draftea opcionales
 python predecir.py Toluca America --cuota over2.5=1.85 --cuota local=1.70 --cuota hcp_local-1.5=3.10
 
