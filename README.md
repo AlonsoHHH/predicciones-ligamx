@@ -66,10 +66,9 @@ con todo el historial desde 2012 (las cifras casi no cambian si sólo se usa
 **El modelo todavía no le gana al mercado.** Apostar 1X2 con valor esperado
 mayor a 5% contra la cuota promedio perdió alrededor de 9% por apuesta. Para
 over/under, el modelo aún no supera a la tasa base y es demasiado confiado en
-los extremos. Es una línea base: los siguientes pasos son entrenar con todo el
-historial desde 2012, agregar features propias de la Liga MX (altitud, viajes,
-descanso), xG y cuotas históricas de over/under para medir valor en ese
-mercado.
+los extremos. Es una línea base: los siguientes pasos son agregar features propias de la
+Liga MX (altitud, viajes, descanso) y cuotas históricas de over/under para
+medir valor en ese mercado.
 
 Con las estadísticas de Sportmonks (sólo hay 3 temporadas en el plan Starter),
 el xG aproximado por tiros **no mejoró** el modelo en 449 partidos desde julio de
