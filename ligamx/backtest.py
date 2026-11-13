@@ -17,18 +17,26 @@ CLASES = ["l", "e", "v"]
 
 def predecir_walk_forward(df: pd.DataFrame, desde: str, xi: float | None = None,
                           l2: float | None = None, peso_xg: float = 0.0,
-                          stats: pd.DataFrame | None = None, con_contexto: bool = False) -> pd.DataFrame:
+                          stats: pd.DataFrame | None = None, con_contexto: bool = False,
+                          once: pd.DataFrame | None = None) -> pd.DataFrame:
+    """`once`: salida de sportmonks.regularidad_once para usar las alineaciones."""
     df = df.sort_values("fecha", kind="mergesort").reset_index(drop=True)
-    covs = contexto.COVARIABLES if con_contexto else []
-    if covs:
+    covs = list(contexto.COVARIABLES) if con_contexto else []
+    if con_contexto:
         df = contexto.agregar(df)
+    if once is not None:
+        df = sportmonks.unir(df, once).reset_index(drop=True)
+        for c in ("once_l", "once_v"):
+            # Centrado en el promedio de la liga; partidos sin alineación quedan en 0.
+            df[c] = (df[c] - once[c].mean()).fillna(0.0)
+        covs += ["once_l", "once_v"]
     if peso_xg:
         # Los coeficientes del xG se ajustan sólo con partidos anteriores a `desde`.
         df = sportmonks.unir(df, stats).reset_index(drop=True)
         df["xg_l"], df["xg_v"] = sportmonks.ajustar_xg(df[df["fecha"] < desde])(df)
     df, _ = elo.calcular(df)
     df["semana"] = df["fecha"].dt.to_period("W-MON").dt.start_time
-    modelo = DixonColes(peso_xg=peso_xg, covariables=list(covs), **{k: v for k, v in {"xi": xi, "l2": l2}.items() if v is not None})
+    modelo = DixonColes(peso_xg=peso_xg, covariables=covs, **{k: v for k, v in {"xi": xi, "l2": l2}.items() if v is not None})
     filas = []
     for semana, bloque in df[df["fecha"] >= pd.Timestamp(desde)].groupby("semana"):
         historia = df[df["fecha"] < semana]

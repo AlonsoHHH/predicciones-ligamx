@@ -104,3 +104,17 @@ def test_contexto_altitud_viaje_descanso():
     assert c.loc[1, "altitud"] == pytest.approx(-2.63)
     assert 2.0 < c.loc[0, "viaje"] < 2.5          # Toluca-Tijuana, unos 2,300 km
     assert c.loc[2, "descanso"] == pytest.approx(0.0)  # ambos con 3 días
+
+
+def test_regularidad_once():
+    from ligamx import sportmonks
+    filas = []
+    fechas = pd.date_range("2025-08-01", periods=5, freq="7D")
+    for i, f in enumerate(fechas):
+        titulares = range(11) if i < 4 else list(range(6)) + list(range(100, 105))
+        filas += [{"fecha": f, "local": "Toluca", "visita": f"R{i}", "lado": "l", "player_id": p}
+                  for p in titulares]
+    r = sportmonks.regularidad_once(pd.DataFrame(filas)).set_index("visita")["once_l"]
+    assert r["R3"] == pytest.approx(1.0)        # mismo once las 3 previas
+    assert r["R4"] == pytest.approx(6 / 11)     # 5 cambios
+    assert "R0" not in r.index                  # sin historia suficiente

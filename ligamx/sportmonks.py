@@ -107,3 +107,47 @@ def ajustar_xg(df: pd.DataFrame):
         return xl, xv
 
     return xg
+
+
+def alineaciones(forzar: bool = False) -> pd.DataFrame:
+    """Titulares por partido: fecha, local, visita, lado ('l'/'v'), player_id."""
+    ruta: Path = DIR_CACHE / "sportmonks_alineaciones.csv"
+    if ruta.exists() and not forzar:
+        return pd.read_csv(ruta, parse_dates=["fecha"])
+    filas = []
+    for season_id in temporadas():
+        r = _get(f"seasons/{season_id}", include="fixtures.lineups;fixtures.participants")
+        for f in r["data"].get("fixtures") or []:
+            if f.get("state_id") != 5:
+                continue
+            equipos = {p["meta"]["location"]: p for p in f["participants"]}
+            lado = {equipos["home"]["id"]: "l", equipos["away"]["id"]: "v"}
+            base = {"fecha": pd.Timestamp(f["starting_at"]).normalize(),
+                    "local": NOMBRES.get(equipos["home"]["name"], equipos["home"]["name"]),
+                    "visita": NOMBRES.get(equipos["away"]["name"], equipos["away"]["name"])}
+            for j in f.get("lineups") or []:
+                if j["type_id"] == 11 and j["team_id"] in lado:   # 11 = titular
+                    filas.append({**base, "lado": lado[j["team_id"]], "player_id": j["player_id"]})
+    df = pd.DataFrame(filas)
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(ruta, index=False)
+    return df
+
+
+def regularidad_once(alin: pd.DataFrame, ventana: int = 10) -> pd.DataFrame:
+    """Qué tan "de gala" es cada once: promedio, entre los 11 titulares, de la
+    fracción de los `ventana` partidos anteriores del equipo que cada uno fue titular.
+    1 = el once de siempre; valores bajos = rotación o bajas. Sólo usa partidos previos."""
+    alin = alin.assign(equipo=lambda d: d["local"].where(d["lado"] == "l", d["visita"]))
+    filas = []
+    for equipo, d in alin.groupby("equipo"):
+        partidos = d.groupby(["fecha", "local", "visita", "lado"])["player_id"].apply(set).sort_index(level=0)
+        previos: list[set] = []
+        for (fecha, local, visita, lado), titulares in partidos.items():
+            if len(previos) >= 3:
+                h = previos[-ventana:]
+                valor = sum(sum(p in s for s in h) / len(h) for p in titulares) / len(titulares)
+                filas.append({"fecha": fecha, "local": local, "visita": visita, f"once_{lado}": valor})
+            previos.append(titulares)
+    out = pd.DataFrame(filas)
+    return out.groupby(["fecha", "local", "visita"], as_index=False).first()

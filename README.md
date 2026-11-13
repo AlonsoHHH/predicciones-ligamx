@@ -26,7 +26,11 @@ pensado para comparar contra las cuotas de Draftea.
 6. **Contexto** (`ligamx/contexto.py`): altitud del estadio contra la de casa
    del visitante, distancia de viaje y días de descanso. Con `--contexto` entran
    al modelo como covariables.
-7. **Backtest** (`ligamx/backtest.py`): walk-forward semanal, sin ver el
+7. **Alineaciones** (`sportmonks.alineaciones`, `sportmonks.regularidad_once`):
+   para cada once titular, qué tan seguido jugó cada titular en los 10 partidos
+   previos del equipo (1 = el once de siempre). Con `--alineaciones` entra al
+   modelo. Sólo hay datos desde 2024-25.
+8. **Backtest** (`ligamx/backtest.py`): walk-forward semanal, sin ver el
    futuro, contra el mercado de cierre.
 
 ## Uso
@@ -84,6 +88,14 @@ tienen sentido: cada 1,000 m de diferencia de altitud suben 5% los goles del
 local y bajan 5% los del visitante, y cada 1,000 km de viaje bajan 10% los del
 visitante. Altitud y viaje explican más de la mitad de la ventaja de local,
 pero eso ya lo descuenta el mercado.
+
+Las alineaciones son lo que más ayuda hasta ahora. En 449 partidos desde julio
+de 2025, el log-loss 1X2 baja de 1.030 a 1.026 (mercado: 1.005) y over/under 2.5
+de 0.703 a 0.701 (tasa base: 0.690). Un once 10 puntos más "titular" de lo
+normal sube unos 4% los goles del local. La simulación de apuestas pasa de
+-12% a -6% por apuesta, pero con unas 300 apuestas eso todavía es ruido. Para
+usarlo al predecir hace falta la alineación confirmada, que sale cerca de una
+hora antes del partido.
 
 **No uses estas probabilidades para apostar dinero real hasta que el backtest
 muestre ventaja sobre el mercado.**
