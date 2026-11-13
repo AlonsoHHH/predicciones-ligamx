@@ -8,10 +8,13 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
+import estilo
+
 from ligamx import datos, elo, extras, mercados, sportmonks
 from ligamx.dixon_coles import DixonColes
 
 st.set_page_config(page_title="Predicciones Liga MX", page_icon="⚽", layout="wide")
+estilo.aplicar()
 
 
 @st.cache_resource(show_spinner="Cargando partidos y ajustando el modelo…")
@@ -44,8 +47,8 @@ with st.sidebar:
     df, modelo, ratings, equipos = cargar()
     st.caption(f"Partidos hasta el {df['fecha'].max():%d/%m/%Y} · {len(df):,} partidos desde 2012")
     st.subheader("Tabla de poder (Elo)")
-    st.dataframe(pd.DataFrame({"Equipo": equipos, "Elo": [round(ratings[e]) for e in equipos]})
-                 .sort_values("Elo", ascending=False), hide_index=True, width="stretch")
+    estilo.tabla(pd.DataFrame({"Equipo": equipos, "Elo": [round(ratings[e]) for e in equipos]})
+                 .sort_values("Elo", ascending=False))
 
 st.title("Predicciones Liga MX")
 st.warning("En el backtest, el mercado de cierre todavía es más preciso que este modelo. "
@@ -63,9 +66,8 @@ p = r["1x2"]
 k = st.columns(5)
 for col, nombre, prob in ((k[0], f"Gana {local}", p["local"]), (k[1], "Empate", p["empate"]),
                           (k[2], f"Gana {visita}", p["visita"]), (k[4], "Ambos anotan", r["ambos_anotan"])):
-    col.metric(nombre, f"{prob:.0%}")
-    col.caption(f"Cuota justa {1 / prob:.2f}")
-k[3].metric("Goles esperados", f"{lam:.2f} - {mu:.2f}")
+    estilo.isla(col, nombre, f"{prob:.0%}", f"Cuota justa {1 / prob:.2f}", estilo.es_alta(prob))
+estilo.isla(k[3], "Goles esperados", f"{lam:.2f} - {mu:.2f}", f"Total {lam + mu:.2f}")
 
 
 
@@ -76,7 +78,7 @@ def tabla(filas: list[tuple[str, mercados.Resultado]]) -> None:
                       "Cuota justa": [f"{res.cuota_justa():.2f}" for _, res in filas]})
     if not any(res.anula for _, res in filas):   # sólo las líneas enteras de hándicap devuelven
         t = t.drop(columns="Devuelve")
-    st.dataframe(t, hide_index=True, width="stretch")
+    estilo.tabla(t, ("Prob.",))
 
 
 totales, handicaps = [], []
@@ -117,14 +119,15 @@ t1, t2, t3 = st.tabs(["Mitades y primer gol", "Tiros, córners y tarjetas", "Jug
 with t1:
     x = extras.mitades_y_primer_gol(lam, mu)
     c = st.columns(3)
-    c[0].metric(f"Anota primero {local}", f"{x['anota_primero_local']:.0%}")
-    c[1].metric(f"Anota primero {visita}", f"{x['anota_primero_visita']:.0%}")
-    c[2].metric("Sin goles", f"{x['sin_goles']:.0%}")
-    st.dataframe(pd.DataFrame({
+    for col, nombre, clave in ((c[0], f"Anota primero {local}", "anota_primero_local"),
+                               (c[1], f"Anota primero {visita}", "anota_primero_visita"),
+                               (c[2], "Sin goles", "sin_goles")):
+        estilo.isla(col, nombre, f"{x[clave]:.0%}", alta=estilo.es_alta(x[clave]))
+    estilo.tabla(pd.DataFrame({
         "": ["Hay gol", f"Anota {local}", f"Anota {visita}"],
         "1a mitad": [f"{x[k]:.0%}" for k in ("gol_1a_mitad", "local_anota_1a", "visita_anota_1a")],
         "2a mitad": [f"{x[k]:.0%}" for k in ("gol_2a_mitad", "local_anota_2a", "visita_anota_2a")]}),
-        hide_index=True, width="stretch")
+        ("1a mitad", "2a mitad"))
     st.caption(f"Más goles en la 2a mitad que en la 1a: {x['mas_goles_2a_mitad']:.0%}. "
                "En la Liga MX, 45% de los goles caen en la primera mitad.")
 if isinstance(sm, str):
@@ -141,23 +144,22 @@ else:
             e.loc["amarillas"] *= suyo / liga
             st.caption(f"{arbitro}: {suyo:.1f} amarillas por partido en {n} partidos (liga: {liga:.1f}).")
         e.index = ["Tiros", "Tiros a gol", "Córners", "Amarillas"]
-        st.dataframe(e.rename(columns={"local": local, "visita": visita, "total": "Total"}).round(1),
-                     width="stretch")
+        estilo.tabla(e.rename(columns={"local": local, "visita": visita, "total": "Total"})
+                     .rename_axis("").reset_index())
         st.caption("Promedio de los últimos 10 partidos de cada equipo, ajustado por rival. En el backtest "
                    "sólo tiros y córners mejoran un poco al promedio de la liga; tarjetas y tiros a gol no.")
     with t3:
         for col, equipo, tasa in zip(st.tabs([local, visita]), (local, visita), (lam, mu)):
             j = extras.jugadores_partido(jug, equipo, tasa).head(14)
-            col.dataframe(pd.DataFrame({
+            estilo.tabla(pd.DataFrame({
                 "Jugador": j["jugador"], "Anota": [f"{v:.0%}" for v in j["p_gol"]],
                 "Cuota justa": [f"{1 / v:.2f}" for v in j["p_gol"]],
                 "Asiste": [f"{v:.0%}" for v in j["p_asistencia"]],
                 "Tiros": j["tiros_esp"].round(1), "A gol": j["tiros_gol_esp"].round(1),
-                "Min.": j["min_esp"].round(0)}), hide_index=True, width="stretch")
-        st.caption("Con los minutos promedio de los últimos 5 partidos: si un jugador no es titular, "
+                "Min.": j["min_esp"].round().astype(int)}), ("Anota", "Asiste"), umbral=0.30, en=col)
+        st.caption("En verde, 30% o más. Con los minutos promedio de los últimos 5 partidos: si un jugador no es titular, "
                    "su probabilidad real es menor. No considera lesiones ni suspensiones.")
 
 with st.expander("Marcadores más probables"):
     top = sorted(((m[i, j], f"{i}-{j}") for i in range(6) for j in range(6)), reverse=True)[:10]
-    st.dataframe(pd.DataFrame({"Marcador": [s for _, s in top], "Prob.": [f"{q:.1%}" for q, _ in top]}),
-                 hide_index=True)
+    estilo.tabla(pd.DataFrame({"Marcador": [s for _, s in top], "Prob.": [f"{q:.1%}" for q, _ in top]}))
