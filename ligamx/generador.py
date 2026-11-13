@@ -68,7 +68,8 @@ def generar(candidatas: pd.DataFrame, sencillas: int = 4, parlays: int = 3) -> p
         usados: set[str] = set()   # cada parlay del nivel usa partidos distintos a los anteriores
         hechos = 0
         for legs in sorted(combos, key=lambda c: abs(c["prob"].prod() - parlay)):
-            if hechos < parlays and usados.isdisjoint(legs["partido"]):
+            if (hechos < parlays and usados.isdisjoint(legs["partido"])
+                    and abs(legs["prob"].prod() - parlay) < 0.12):   # nada lejos del objetivo del nivel
                 usados |= set(legs["partido"])
                 hechos += 1
                 filas.append(_fila(nivel, f"Parlay de {len(legs)}", legs))
