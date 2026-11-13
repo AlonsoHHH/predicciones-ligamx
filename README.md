@@ -97,6 +97,14 @@ normal sube unos 4% los goles del local. La simulación de apuestas pasa de
 usarlo al predecir hace falta la alineación confirmada, que sale cerca de una
 hora antes del partido.
 
+Lo que se probó y **no** ayudó (por eso no está en el código):
+- Rating por jugador con regresión ridge tipo "más/menos" sobre goles y tiros a
+  gol: 1.030, igual que sin él. Con sólo 3 temporadas no se separa la calidad
+  del jugador de la del equipo.
+- Lesionados y suspendidos de Sportmonks (`sidelined`), ponderados por qué tan
+  titular era cada ausente: empeora a 1.034. Hay pocos registros (unos 1.5 por
+  partido) y la alineación confirmada ya refleja las bajas.
+
 **No uses estas probabilidades para apostar dinero real hasta que el backtest
 muestre ventaja sobre el mercado.**
 
