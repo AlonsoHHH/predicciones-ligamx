@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
-from . import elo, mercados, sportmonks
+from . import contexto, elo, mercados, sportmonks
 from .datos import probabilidades_mercado
 from .dixon_coles import DixonColes
 
@@ -17,15 +17,18 @@ CLASES = ["l", "e", "v"]
 
 def predecir_walk_forward(df: pd.DataFrame, desde: str, xi: float | None = None,
                           l2: float | None = None, peso_xg: float = 0.0,
-                          stats: pd.DataFrame | None = None) -> pd.DataFrame:
+                          stats: pd.DataFrame | None = None, con_contexto: bool = False) -> pd.DataFrame:
     df = df.sort_values("fecha", kind="mergesort").reset_index(drop=True)
+    covs = contexto.COVARIABLES if con_contexto else []
+    if covs:
+        df = contexto.agregar(df)
     if peso_xg:
         # Los coeficientes del xG se ajustan sólo con partidos anteriores a `desde`.
         df = sportmonks.unir(df, stats).reset_index(drop=True)
         df["xg_l"], df["xg_v"] = sportmonks.ajustar_xg(df[df["fecha"] < desde])(df)
     df, _ = elo.calcular(df)
     df["semana"] = df["fecha"].dt.to_period("W-MON").dt.start_time
-    modelo = DixonColes(peso_xg=peso_xg, **{k: v for k, v in {"xi": xi, "l2": l2}.items() if v is not None})
+    modelo = DixonColes(peso_xg=peso_xg, covariables=list(covs), **{k: v for k, v in {"xi": xi, "l2": l2}.items() if v is not None})
     filas = []
     for semana, bloque in df[df["fecha"] >= pd.Timestamp(desde)].groupby("semana"):
         historia = df[df["fecha"] < semana]
@@ -33,9 +36,10 @@ def predecir_walk_forward(df: pd.DataFrame, desde: str, xi: float | None = None,
         tasa_over = ((historia["gl"] + historia["gv"]) > 2.5).tail(600).mean()
         logit = _ajustar_elo_logit(historia)
         for fila in bloque.itertuples(index=False):
-            m = modelo.matriz(fila.local, fila.visita)
+            ctx = {c: getattr(fila, c) for c in covs}
+            m = modelo.matriz(fila.local, fila.visita, ctx)
             p = mercados.uno_x_dos(m)
-            lam, mu = modelo.goles_esperados(fila.local, fila.visita)
+            lam, mu = modelo.goles_esperados(fila.local, fila.visita, ctx)
             pe = logit.predict_proba([[fila.elo_dif]])[0]
             filas.append({
                 "fecha": fila.fecha, "torneo": fila.torneo, "fase": fila.fase,

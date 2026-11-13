@@ -92,3 +92,15 @@ def test_unir_tolera_un_dia_de_diferencia():
     u = sportmonks.unir(partidos, stats)
     assert u.loc[u.local == "Toluca", "tiros_gol_l"].item() == 5
     assert u.loc[u.local == "Atlas", "tiros_gol_l"].isna().item()
+
+
+def test_contexto_altitud_viaje_descanso():
+    from ligamx import contexto
+    df = pd.DataFrame({"fecha": pd.to_datetime(["2026-08-01", "2026-08-08", "2026-08-11"]),
+                       "local": ["Toluca", "Club Tijuana", "Toluca"],
+                       "visita": ["Club Tijuana", "Toluca", "Club Tijuana"]})
+    c = contexto.agregar(df)
+    assert c.loc[0, "altitud"] == pytest.approx(2.63)
+    assert c.loc[1, "altitud"] == pytest.approx(-2.63)
+    assert 2.0 < c.loc[0, "viaje"] < 2.5          # Toluca-Tijuana, unos 2,300 km
+    assert c.loc[2, "descanso"] == pytest.approx(0.0)  # ambos con 3 días

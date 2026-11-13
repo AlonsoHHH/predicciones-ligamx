@@ -23,7 +23,10 @@ pensado para comparar contra las cuotas de Draftea.
    tiros a gol, ocasiones claras). Con `--peso-xg` el modelo mezcla los goles
    con un xG aproximado a partir de los tiros. El token lo agrega el entorno
    cloud; en otra máquina, define `SPORTMONKS_API_TOKEN`.
-6. **Backtest** (`ligamx/backtest.py`): walk-forward semanal, sin ver el
+6. **Contexto** (`ligamx/contexto.py`): altitud del estadio contra la de casa
+   del visitante, distancia de viaje y días de descanso. Con `--contexto` entran
+   al modelo como covariables.
+7. **Backtest** (`ligamx/backtest.py`): walk-forward semanal, sin ver el
    futuro, contra el mercado de cierre.
 
 ## Uso
@@ -74,6 +77,13 @@ Con las estadísticas de Sportmonks (sólo hay 3 temporadas en el plan Starter),
 el xG aproximado por tiros **no mejoró** el modelo en 449 partidos desde julio de
 2025: el log-loss 1X2 pasó de 1.030 a 1.031 con `--peso-xg 0.3`, y en over/under
 2.5 de 0.703 a 0.702, ambos aún peores que el mercado o la tasa base.
+
+Con `--contexto` (altitud, viaje y descanso), el log-loss 1X2 baja apenas de
+1.008 a 1.0075 y over/under 2.5 empeora un poco (0.691 a 0.692). Los efectos sí
+tienen sentido: cada 1,000 m de diferencia de altitud suben 5% los goles del
+local y bajan 5% los del visitante, y cada 1,000 km de viaje bajan 10% los del
+visitante. Altitud y viaje explican más de la mitad de la ventaja de local,
+pero eso ya lo descuenta el mercado.
 
 **No uses estas probabilidades para apostar dinero real hasta que el backtest
 muestre ventaja sobre el mercado.**

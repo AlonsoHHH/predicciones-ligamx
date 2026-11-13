@@ -37,6 +37,9 @@ class DixonColes:
     base: float = 0.1
     rho: float = -0.05
     peso_xg: float = 0.0   # mezcla goles reales con xG aproximado (columnas xg_l, xg_v)
+    covariables: list[str] = field(default_factory=list)  # columnas de contexto (ver contexto.py)
+    beta_l: dict[str, float] = field(default_factory=dict)  # efecto en log(goles del local)
+    beta_v: dict[str, float] = field(default_factory=dict)  # efecto en log(goles del visitante)
     fecha_corte: pd.Timestamp | None = None
     _x0: np.ndarray | None = None
 
@@ -66,16 +69,19 @@ class DixonColes:
             x = np.where(df["xg_l"].notna(), (1 - self.peso_xg) * gl + self.peso_xg * df["xg_l"], gl)
             y = np.where(df["xg_v"].notna(), (1 - self.peso_xg) * gv + self.peso_xg * df["xg_v"], gv)
 
-        x0 = np.zeros(2 * n + 3)
-        x0[2 * n:] = [0.1, 0.3, -0.05]
-        if self._x0 is not None and self.equipos == equipos:
+        k = len(self.covariables)
+        z = df[self.covariables].to_numpy(float) if k else np.zeros((len(df), 0))
+        x0 = np.zeros(2 * n + 3 + 2 * k)
+        x0[2 * n:2 * n + 3] = [0.1, 0.3, -0.05]
+        if self._x0 is not None and self.equipos == equipos and len(self._x0) == len(x0):
             x0 = self._x0  # arranque en caliente para el walk-forward
 
         def nll(p):
             att, dfn = p[:n], p[n:2 * n]
-            base, loc, rho = p[2 * n:]
-            log_lam = base + loc + att[il] + dfn[iv]
-            log_mu = base + att[iv] + dfn[il]
+            base, loc, rho = p[2 * n:2 * n + 3]
+            bl, bv = p[2 * n + 3:2 * n + 3 + k], p[2 * n + 3 + k:]
+            log_lam = base + loc + att[il] + dfn[iv] + z @ bl
+            log_mu = base + att[iv] + dfn[il] + z @ bv
             lam, mu = np.exp(log_lam), np.exp(log_mu)
 
             ll = x * log_lam - lam - gammaln(x + 1) + y * log_mu - mu - gammaln(y + 1)
@@ -111,6 +117,8 @@ class DixonColes:
             grad[2 * n] = wl.sum() + wm.sum()
             grad[2 * n + 1] = wl.sum()
             grad[2 * n + 2] = (w * g_rho).sum()
+            grad[2 * n + 3:2 * n + 3 + k] = z.T @ wl
+            grad[2 * n + 3 + k:] = z.T @ wm
 
             valor = -(w * ll).sum()
             grad = -grad
@@ -120,7 +128,7 @@ class DixonColes:
             grad[n:2 * n] += 2 * self.l2 * dfn
             return valor + pen, grad
 
-        limites = [(None, None)] * (2 * n + 2) + [(-0.3, 0.3)]
+        limites = [(None, None)] * (2 * n + 2) + [(-0.3, 0.3)] + [(None, None)] * (2 * k)
         res = minimize(nll, x0, jac=True, method="L-BFGS-B", bounds=limites,
                        options={"maxiter": 2000})
         p = res.x
@@ -128,19 +136,26 @@ class DixonColes:
         self.equipos = equipos
         self.ataque = dict(zip(equipos, p[:n]))
         self.defensa = dict(zip(equipos, p[n:2 * n]))
-        self.base, self.local, self.rho = p[2 * n:]
+        self.base, self.local, self.rho = p[2 * n:2 * n + 3]
+        self.beta_l = dict(zip(self.covariables, p[2 * n + 3:2 * n + 3 + k]))
+        self.beta_v = dict(zip(self.covariables, p[2 * n + 3 + k:]))
         return self
 
     # ── predicción ────────────────────────────────────────────────────────
-    def goles_esperados(self, local: str, visita: str) -> tuple[float, float]:
+    def goles_esperados(self, local: str, visita: str, ctx: dict | None = None) -> tuple[float, float]:
+        """`ctx`: valores de las covariables para este partido (faltantes = 0)."""
+        ctx = ctx or {}
         al, dl = self.ataque.get(local, 0.0), self.defensa.get(local, 0.0)
         av, dv = self.ataque.get(visita, 0.0), self.defensa.get(visita, 0.0)
-        lam = np.exp(self.base + self.local + al + dv)
-        mu = np.exp(self.base + av + dl)
+        el = sum(b * ctx.get(c, 0.0) for c, b in self.beta_l.items())
+        ev = sum(b * ctx.get(c, 0.0) for c, b in self.beta_v.items())
+        lam = np.exp(self.base + self.local + al + dv + el)
+        mu = np.exp(self.base + av + dl + ev)
         return float(lam), float(mu)
 
-    def matriz(self, local: str, visita: str, max_goles: int = MAX_GOLES) -> np.ndarray:
-        lam, mu = self.goles_esperados(local, visita)
+    def matriz(self, local: str, visita: str, ctx: dict | None = None,
+               max_goles: int = MAX_GOLES) -> np.ndarray:
+        lam, mu = self.goles_esperados(local, visita, ctx)
         return matriz_marcadores(lam, mu, self.rho, max_goles)
 
 

@@ -22,6 +22,7 @@ def main() -> None:
     ap.add_argument("--l2", type=float, default=None, help="regularización de ataque/defensa")
     ap.add_argument("--peso-xg", type=float, default=0.0,
                     help="mezcla goles con xG aproximado por tiros de Sportmonks (0 a 1)")
+    ap.add_argument("--contexto", action="store_true", help="agrega altitud, viaje y descanso al modelo")
     ap.add_argument("--umbral", type=float, default=0.05, help="valor esperado mínimo para apostar")
     ap.add_argument("--salida", type=Path, help="guarda las predicciones en CSV")
     args = ap.parse_args()
@@ -30,7 +31,8 @@ def main() -> None:
     df = datos.cargar(args.datos)
     stats = sportmonks.descargar() if args.peso_xg else None
     pred = bt.predecir_walk_forward(df, args.desde, xi=args.xi, l2=args.l2,
-                                    peso_xg=args.peso_xg, stats=stats)
+                                    peso_xg=args.peso_xg, stats=stats,
+                                    con_contexto=args.contexto)
     m = bt.metricas(pred)
 
     print(f"\nPartidos de fase regular evaluados: {m['partidos']} (desde {args.desde})")
